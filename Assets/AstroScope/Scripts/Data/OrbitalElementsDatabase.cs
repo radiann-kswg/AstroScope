@@ -2,6 +2,9 @@ using System.Collections.Generic;
 
 namespace AstroScope
 {
+	/// <summary>
+	/// Static lookup table providing mean orbital elements and secular rates for the major planets.
+	/// </summary>
 	public static class OrbitalElementsDatabase
 	{
 		private static readonly Dictionary<PlanetId, OrbitalElements> Elements = new()

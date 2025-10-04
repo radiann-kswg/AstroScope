@@ -4,25 +4,27 @@ This module provides reusable services for Western horoscope (zodiac + houses) a
 
 ## 機能概要
 
-- **エフェメリス計算**: 太陽・月・水金地火木土天海冥の黄経・黄緯・距離を低軌道要素から導出。
-- **ハウス計算**: 等ハウス方式でアセンダントと 12 室、MC を算出。
-- **太陰太陽暦**: 新月アルゴリズムで朔日を推定し、月齢と閏月判定を生成。
-- **節分検出**: 太陽黄経 315° の通過時刻を二分探索で特定し、ローカルタイムへ変換。
-- **九星気学**: 年・月・日盤を 9 周期の数値で返却。
+- **エフェメリス計算**: 太陽・月・水金地火木土天海冥の黄経・黄緯・距離を Meeus ベースの軌道要素から導出し、サイン内度数も同時に計算。
+- **ハウス計算**: 等ハウス方式でアセンダントと 12 室、MC を算出し、サインの重複・欠落によるインターセプトも自動検出。
+- **太陰太陽暦**: 新月アルゴリズムで朔日を推定し、月齢、閏月、節月（主気）の有無を判定。
+- **二十四節気+土用**: 24 節気の通過時刻と、立春・立夏・立秋・立冬／翌立春を基準にした春夏秋冬土用期間を算出。
+- **九星気学 & 干支**: 年・月・日盤 (九星) および 年・月・日干支 (十干十二支) を取得。
+- **ローカライズ対応**: `AstroLocalization` で英語/日本語の UI 文字列を集約。天体名・サイン名・節気名・干支名などを即座に切替可能。
 
 ## 主なスクリプト
 
-| ファイル                                        | 役割                               |
-| ----------------------------------------------- | ---------------------------------- |
-| `Scripts/Math/Angle.cs`                         | 角度計算ユーティリティ。           |
-| `Scripts/Time/JulianDate.cs`                    | 日時とユリウス日 JD/Century 変換。 |
-| `Scripts/Core/EphemerisCalculator.cs`           | 惑星・太陽・月の位置計算。         |
-| `Scripts/Western/HouseCalculator.cs`            | 等ハウス方式のハウス計算。         |
-| `Scripts/Western/WesternHoroscopeCalculator.cs` | 西洋ホロスコープ統合。             |
-| `Scripts/Eastern/EasternAstrologyCalculator.cs` | 太陰太陽暦と九星気学の算出。       |
-| `Scripts/Core/AstroScopeService.cs`             | 西洋/東洋結果をまとめて提供。      |
-| `AstroScpoeMain.cs`                             | サンプル Monobehaviour。           |
-| `Tests/EditMode/AstroScopeCalculatorTests.cs`   | NUnit ベースの検証テスト。         |
+| ファイル                                        | 役割                                             |
+| ----------------------------------------------- | ------------------------------------------------ |
+| `Scripts/Math/Angle.cs`                         | 角度計算ユーティリティ。                         |
+| `Scripts/Time/JulianDate.cs`                    | 日時とユリウス日 JD/Century 変換。               |
+| `Scripts/Core/EphemerisCalculator.cs`           | 惑星・太陽・月の位置計算。                       |
+| `Scripts/Western/HouseCalculator.cs`            | 等ハウス方式のハウス計算とインターセプト検出。   |
+| `Scripts/Western/WesternHoroscopeCalculator.cs` | 西洋ホロスコープ統合 (サイン割当 & 欠落サイン)。 |
+| `Scripts/Eastern/EasternAstrologyCalculator.cs` | 太陰太陽暦・九星・干支・節気・土用の算出。       |
+| `Scripts/Localization/AstroLocalization.cs`     | 英語/日本語ローカライズ用リソース。              |
+| `Scripts/Core/AstroScopeService.cs`             | 西洋/東洋結果をまとめて提供。                    |
+| `AstroScpoeMain.cs`                             | サンプル Monobehaviour。                         |
+| `Tests/EditMode/AstroScopeCalculatorTests.cs`   | NUnit ベースの検証テスト。                       |
 
 ## 利用方法
 
@@ -35,7 +37,39 @@ var service = new AstroScopeService();
 var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Asia/Tokyo");
 DateTime localTime = new DateTime(2024, 2, 4, 12, 0, 0);
 var (western, eastern) = service.ComputeFull(localTime, 35.6895, 139.6917, timeZone);
+
+// ローカライズ例
+AstroLanguage language = AstroLanguage.Japanese;
+foreach (var placement in western.Placements)
+{
+	string planet = AstroLocalization.GetPlanetName(placement.Body, language);
+	string sign = AstroLocalization.GetZodiacName(placement.Sign, language);
+	Console.WriteLine($"{planet}: {sign} {placement.DegreesInSign:F2}°");
+}
+
+string yearGanzhi = AstroLocalization.GetSexagenaryName(eastern.Sexagenary.Year, language);
+Console.WriteLine($"干支(年): {yearGanzhi}");
 ```
+
+## API リファレンス (概要)
+
+- `AstroScopeService`
+  - `ComputeWestern(DateTime utc, double lat, double lon)` : `WesternHoroscopeResult`
+  - `ComputeEastern(DateTime local, double lon, TimeZoneInfo tz)` : `EasternAstrologyResult`
+  - `ComputeFull(DateTime local, double lat, double lon, TimeZoneInfo tz)` : 両者まとめて取得。
+- `WesternHoroscopeResult`
+  - `Bodies`: `CelestialPosition` のリスト (黄経/緯度/距離/サイン内度数)。
+  - `Placements`: UI 向け {惑星, サイン, サイン内度数}。
+  - `Houses`: `HouseCalculationResult` (アセンダント・MC・ハウスカスプ・インターセプト情報)。
+  - `MissingCuspSigns`: ハウスカスプに現れないサイン一覧。
+- `EasternAstrologyResult`
+  - `LunisolarDate`, `LunarAgeDays`, `SetsubunLocal/Utc`。
+  - `Chart`: 九星気学 (年/月/日盤)。
+  - `Sexagenary`: 干支 (年/月/日)。
+  - `SolarTerms`: その年の 24 節気 (`SolarTermEntry`)。
+  - `DoyouPeriods`: 春夏秋冬の土用期間。
+- `AstroLocalization`
+  - `GetPlanetName`, `GetZodiacName`, `GetSolarTermName`, `GetSexagenaryName` など、英語/日本語テキストを返すユーティリティ。
 
 ## Unity6 (Windows) での動作確認シーン
 
@@ -49,6 +83,7 @@ var (western, eastern) = service.ComputeFull(localTime, 35.6895, 139.6917, timeZ
     - `Latitude Degrees`: `35.6895`
     - `Longitude Degrees`: `139.6917`
     - `Time Zone Id`: **Windows では** `Tokyo Standard Time`（IANA 形式 `Asia/Tokyo` は例外で落ちるため要注意）
+    - `Language`: `Japanese` もしくは `English`
     - `Compute On Start`: `true`
   - `Canvas` (Screen Space - Overlay)
   - `Panel` (Image) : 任意の背景色を設定し、幅 600px / 高さ 400px 程度の情報パネルを作成。
@@ -94,10 +129,14 @@ public class AstroScopeLogView : MonoBehaviour
 
 1. 上記シーンを保存して開いた状態で、`Window > General > Console` を表示。
 2. Play モードに入ると `Compute On Start` により即時に西洋 / 東洋の結果がログに出力されます。
-3. 出力例:
-   - `[AstroScope] Western Horoscope for 2025-02-04 03:00:00Z`
-   - `[AstroScope] Eastern Astrology` など各計算結果が列挙されます。
-4. 値を変更したい場合は Play 中に緯度・経度・タイムゾーンを編集し、`Button` から再計算。
+3. 出力例 (Japanese 設定):
+
+- `Sun (牡羊座 12.34°): λ=...`
+- `インターセプト: 双子座 → 第5室`
+- `Sexagenary: Year=甲辰, Month=乙卯, Day=丙子`
+- `Upcoming Solar Terms` / `土用` 期間など
+
+4. 値や表示言語を変更したい場合は Play 中に `Language` や緯度・経度・タイムゾーンを編集し、`Button` から再計算。
 
 ### 補足
 
@@ -120,4 +159,5 @@ Unity Test Runner の Edit Mode で `AstroScope/Tests/EditMode/AstroScopeCalcula
 ## 既知の制限
 
 - 惑星位置は Meeus 第 2 版の簡易係数を使用しており、数分角程度の誤差が想定されます。
-- 九星気学の月盤判定は簡略化された主気法に基づいているため、公式暦と差異が発生する可能性があります。必要に応じて補正テーブルの導入をご検討ください。
+- 九星気学の月盤および干支の月判定は簡略化された主気法に基づいているため、公式暦と差異が発生する可能性があります。必要に応じて補正テーブルの導入をご検討ください。
+- 土用期間は節気の実測値から一律 18 日を遡る方式で計算しています。細かな流派差異には未対応です。

@@ -2,8 +2,12 @@ using System;
 
 namespace AstroScope
 {
+	/// <summary>
+	/// Astronomical time helpers (obliquity and sidereal time calculations).
+	/// </summary>
 	public static class AstroTime
 	{
+		/// <summary>Computes the mean obliquity of the ecliptic (ε) for the specified Julian centuries since J2000.</summary>
 		public static double MeanObliquity(double julianCenturies)
 		{
 			double seconds = 21.448 - julianCenturies * (46.815 + julianCenturies * (0.00059 - julianCenturies * 0.001813));
@@ -11,6 +15,7 @@ namespace AstroScope
 			return degrees;
 		}
 
+		/// <summary>Computes the apparent local sidereal time in degrees for a given UTC moment and observer longitude.</summary>
 		public static double ApparentSiderealTime(DateTime dateTimeUtc, double longitude)
 		{
 			double jd = JulianDate.FromDateTime(dateTimeUtc);
@@ -24,6 +29,7 @@ namespace AstroScope
 			return lmst;
 		}
 
+		/// <summary>Computes the mean Greenwich sidereal time in degrees for a UTC instant.</summary>
 		public static double MeanSiderealTime(DateTime dateTimeUtc)
 		{
 			double jd = JulianDate.FromDateTime(dateTimeUtc);

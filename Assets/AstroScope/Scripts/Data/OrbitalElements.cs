@@ -2,6 +2,9 @@ using System;
 
 namespace AstroScope
 {
+	/// <summary>
+	/// Describes orbital elements and linear rates for VSOP-style heliocentric calculations.
+	/// </summary>
 	[Serializable]
 	public struct OrbitalElements
 	{

@@ -1,14 +1,49 @@
 using System;
+using System.Collections.Generic;
 
 namespace AstroScope
 {
+	/// <summary>
+	/// Calculates lunisolar calendar data, Nine Star Ki, sexagenary cycles, solar terms, and doyō periods.
+	/// </summary>
 	public class EasternAstrologyCalculator
 	{
 		private const double SynodicMonth = 29.530588853;
 		private const double NewMoonEpochJd = 2451550.09765; // 2000-01-06 18:14 UT
+		private static readonly (SolarTermId Id, double Longitude, int Month, int Day)[] SolarTermDefinitions =
+		{
+			(SolarTermId.MinorCold, 285.0, 1, 5),
+			(SolarTermId.MajorCold, 300.0, 1, 20),
+			(SolarTermId.StartOfSpring, 315.0, 2, 4),
+			(SolarTermId.RainWater, 330.0, 2, 19),
+			(SolarTermId.AwakeningOfInsects, 345.0, 3, 6),
+			(SolarTermId.SpringEquinox, 0.0, 3, 21),
+			(SolarTermId.PureBrightness, 15.0, 4, 5),
+			(SolarTermId.GrainRain, 30.0, 4, 20),
+			(SolarTermId.StartOfSummer, 45.0, 5, 5),
+			(SolarTermId.GrainFull, 60.0, 5, 20),
+			(SolarTermId.GrainInEar, 75.0, 6, 5),
+			(SolarTermId.SummerSolstice, 90.0, 6, 21),
+			(SolarTermId.MinorHeat, 105.0, 7, 7),
+			(SolarTermId.MajorHeat, 120.0, 7, 23),
+			(SolarTermId.StartOfAutumn, 135.0, 8, 7),
+			(SolarTermId.EndOfHeat, 150.0, 8, 23),
+			(SolarTermId.WhiteDew, 165.0, 9, 7),
+			(SolarTermId.AutumnEquinox, 180.0, 9, 23),
+			(SolarTermId.ColdDew, 195.0, 10, 8),
+			(SolarTermId.FrostDescent, 210.0, 10, 23),
+			(SolarTermId.StartOfWinter, 225.0, 11, 7),
+			(SolarTermId.MinorSnow, 240.0, 11, 22),
+			(SolarTermId.MajorSnow, 255.0, 12, 7),
+			(SolarTermId.WinterSolstice, 270.0, 12, 21)
+		};
 
 		private readonly EphemerisCalculator _ephemerisCalculator = new();
 
+		/// <summary>
+		/// Computes Eastern astrology measurements for a local civil time, including lunisolar date,
+		/// 九星, 干支, 二十四節気, and 土用 periods. Local time zone is required for conversions.
+		/// </summary>
 		public EasternAstrologyResult Compute(DateTime dateTimeLocal, double longitudeDegrees, TimeZoneInfo timeZone)
 		{
 			DateTime dateTimeUtc = TimeZoneInfo.ConvertTimeToUtc(dateTimeLocal, timeZone);
@@ -17,20 +52,24 @@ namespace AstroScope
 			var (prevNewMoon, nextNewMoon) = GetBoundingNewMoons(julianDay);
 			var lunisolarDate = BuildLunisolarDate(julianDay, prevNewMoon, nextNewMoon);
 
-			DateTime setsuLocal = FindSetsubun(dateTimeLocal.Year, longitudeDegrees, timeZone);
-			if (dateTimeLocal < setsuLocal)
-			{
-				setsuLocal = FindSetsubun(dateTimeLocal.Year - 1, longitudeDegrees, timeZone);
-			}
+			var solarTermCache = BuildSolarTermCache(dateTimeLocal.Year, longitudeDegrees, timeZone);
+			var currentLichun = solarTermCache[(dateTimeLocal.Year, SolarTermId.StartOfSpring)];
+			var previousLichun = solarTermCache[(dateTimeLocal.Year - 1, SolarTermId.StartOfSpring)];
 
-			var setsuUtc = TimeZoneInfo.ConvertTimeToUtc(setsuLocal, timeZone);
-			int referenceYear = dateTimeLocal >= setsuLocal
-				? dateTimeLocal.Year
-				: dateTimeLocal.Year - 1;
+			bool afterCurrentLichun = dateTimeLocal >= currentLichun.DateTimeLocal;
+			var activeLichun = afterCurrentLichun ? currentLichun : previousLichun;
+
+			DateTime setsuLocal = activeLichun.DateTimeLocal;
+			DateTime setsuUtc = activeLichun.DateTimeUtc;
+			int referenceYear = afterCurrentLichun ? dateTimeLocal.Year : dateTimeLocal.Year - 1;
 
 			int yearStar = ComputeNineStarYear(referenceYear);
 			int monthStar = ComputeNineStarMonth(yearStar, lunisolarDate.Month);
 			int dayStar = ComputeNineStarDay(julianDay);
+
+			var sexagenary = ComputeSexagenary(referenceYear, lunisolarDate.Month, julianDay);
+			var solarTermsForYear = GetSolarTermsForYear(dateTimeLocal.Year, solarTermCache);
+			var doyouPeriods = ComputeDoyouPeriods(dateTimeLocal.Year, solarTermCache, timeZone);
 
 			return new EasternAstrologyResult
 			{
@@ -44,8 +83,181 @@ namespace AstroScope
 					YearStar = yearStar,
 					MonthStar = monthStar,
 					DayStar = dayStar
+				},
+				Sexagenary = sexagenary,
+				SolarTerms = solarTermsForYear,
+				DoyouPeriods = doyouPeriods
+			};
+		}
+
+		private Dictionary<(int Year, SolarTermId Id), SolarTermEntry> BuildSolarTermCache(int centerYear, double longitudeDegrees, TimeZoneInfo timeZone)
+		{
+			var cache = new Dictionary<(int, SolarTermId), SolarTermEntry>();
+			AddSolarTermsForYear(cache, centerYear - 1, longitudeDegrees, timeZone);
+			AddSolarTermsForYear(cache, centerYear, longitudeDegrees, timeZone);
+			AddSolarTermsForYear(cache, centerYear + 1, longitudeDegrees, timeZone);
+			return cache;
+		}
+
+		private void AddSolarTermsForYear(Dictionary<(int, SolarTermId), SolarTermEntry> cache, int year, double longitudeDegrees, TimeZoneInfo timeZone)
+		{
+			foreach (var definition in SolarTermDefinitions)
+			{
+				cache[(year, definition.Id)] = ComputeSolarTermEntry(year, definition, longitudeDegrees, timeZone);
+			}
+		}
+
+		private SolarTermEntry ComputeSolarTermEntry(int year, (SolarTermId Id, double Longitude, int Month, int Day) definition, double longitudeDegrees, TimeZoneInfo timeZone)
+		{
+			TimeSpan longitudeOffset = TimeSpan.FromHours(longitudeDegrees / 15.0);
+			DateTime approximateUtc = new DateTime(year, definition.Month, definition.Day, 0, 0, 0, DateTimeKind.Utc) - longitudeOffset;
+			DateTime start = approximateUtc.AddDays(-7);
+			DateTime end = approximateUtc.AddDays(7);
+			DateTime crossingUtc = FindSolarLongitudeCrossingUtc(start, end, definition.Longitude);
+			return new SolarTermEntry
+			{
+				Id = definition.Id,
+				TargetLongitude = definition.Longitude,
+				DateTimeUtc = crossingUtc,
+				DateTimeLocal = TimeZoneInfo.ConvertTimeFromUtc(crossingUtc, timeZone)
+			};
+		}
+
+		private static List<SolarTermEntry> GetSolarTermsForYear(int year, Dictionary<(int, SolarTermId), SolarTermEntry> cache)
+		{
+			var list = new List<SolarTermEntry>(SolarTermDefinitions.Length);
+			foreach (var definition in SolarTermDefinitions)
+			{
+				if (cache.TryGetValue((year, definition.Id), out var entry))
+				{
+					list.Add(entry);
+				}
+			}
+			list.Sort((a, b) => a.DateTimeUtc.CompareTo(b.DateTimeUtc));
+			return list;
+		}
+
+		private List<DoyouPeriod> ComputeDoyouPeriods(int year, Dictionary<(int, SolarTermId), SolarTermEntry> cache, TimeZoneInfo timeZone)
+		{
+			var list = new List<DoyouPeriod>(4)
+			{
+				CreateDoyouPeriod(DoyouSeason.Spring, cache[(year, SolarTermId.StartOfSpring)], timeZone),
+				CreateDoyouPeriod(DoyouSeason.Summer, cache[(year, SolarTermId.StartOfSummer)], timeZone),
+				CreateDoyouPeriod(DoyouSeason.Autumn, cache[(year, SolarTermId.StartOfAutumn)], timeZone),
+				CreateDoyouPeriod(DoyouSeason.Winter, cache[(year + 1, SolarTermId.StartOfSpring)], timeZone)
+			};
+			return list;
+		}
+
+		private static DoyouPeriod CreateDoyouPeriod(DoyouSeason season, SolarTermEntry anchor, TimeZoneInfo timeZone)
+		{
+			DateTime startUtc = anchor.DateTimeUtc.AddDays(-18);
+			DateTime endUtc = anchor.DateTimeUtc;
+			return new DoyouPeriod
+			{
+				Season = season,
+				StartUtc = startUtc,
+				EndUtc = endUtc,
+				StartLocal = TimeZoneInfo.ConvertTimeFromUtc(startUtc, timeZone),
+				EndLocal = anchor.DateTimeLocal
+			};
+		}
+
+		private static SexagenaryDate ComputeSexagenary(int referenceYear, int lunisolarMonth, double julianDay)
+		{
+			int yearStemIndex = Mod(referenceYear - 4, 10);
+			int yearBranchIndex = Mod(referenceYear - 4, 12);
+
+			int monthIndex = lunisolarMonth <= 0 ? 1 : lunisolarMonth;
+			int monthStemIndex = Mod(yearStemIndex * 2 + monthIndex - 1, 10);
+			int monthBranchIndex = Mod(monthIndex + 1, 12);
+
+			int julianDayNumber = (int)Math.Floor(julianDay + 0.5);
+			int dayStemIndex = Mod(julianDayNumber + 9, 10);
+			int dayBranchIndex = Mod(julianDayNumber + 1, 12);
+
+			return new SexagenaryDate
+			{
+				Year = new SexagenaryCycle
+				{
+					Stem = (HeavenlyStem)yearStemIndex,
+					Branch = (EarthlyBranch)yearBranchIndex
+				},
+				Month = new SexagenaryCycle
+				{
+					Stem = (HeavenlyStem)monthStemIndex,
+					Branch = (EarthlyBranch)monthBranchIndex
+				},
+				Day = new SexagenaryCycle
+				{
+					Stem = (HeavenlyStem)dayStemIndex,
+					Branch = (EarthlyBranch)dayBranchIndex
 				}
 			};
+		}
+
+		private DateTime FindSolarLongitudeCrossingUtc(DateTime startUtc, DateTime endUtc, double targetLongitude)
+		{
+			const int maxIterations = 1024;
+			TimeSpan step = TimeSpan.FromHours(6);
+			DateTime current = startUtc;
+			double previousDiff = LongitudeDifference(current, targetLongitude);
+			for (int i = 0; i < maxIterations && current < endUtc; i++)
+			{
+				DateTime next = current.Add(step);
+				if (next > endUtc)
+				{
+					next = endUtc;
+				}
+
+				double nextDiff = LongitudeDifference(next, targetLongitude);
+				if (previousDiff == 0.0 || previousDiff * nextDiff <= 0.0)
+				{
+					return RefineSolarLongitudeCrossingUtc(current, next, targetLongitude);
+				}
+
+				current = next;
+				previousDiff = nextDiff;
+			}
+
+			return RefineSolarLongitudeCrossingUtc(current, endUtc, targetLongitude);
+		}
+
+		private DateTime RefineSolarLongitudeCrossingUtc(DateTime low, DateTime high, double targetLongitude)
+		{
+			for (int i = 0; i < 32; i++)
+			{
+				DateTime mid = low + TimeSpan.FromTicks((high.Ticks - low.Ticks) / 2);
+				double diff = LongitudeDifference(mid, targetLongitude);
+				if (Math.Abs(diff) < 1e-6)
+				{
+					return mid;
+				}
+
+				double diffLow = LongitudeDifference(low, targetLongitude);
+				if (diffLow * diff <= 0)
+				{
+					high = mid;
+				}
+				else
+				{
+					low = mid;
+				}
+			}
+
+			return low + TimeSpan.FromTicks((high.Ticks - low.Ticks) / 2);
+		}
+
+		private double LongitudeDifference(DateTime utc, double targetLongitude)
+		{
+			double longitude = _ephemerisCalculator.GetPosition(PlanetId.Sun, utc).EclipticLongitude;
+			return Angle.WrapDegrees180(longitude - targetLongitude);
+		}
+
+		private static int Mod(int value, int modulus)
+		{
+			int result = value % modulus;
+			return result < 0 ? result + modulus : result;
 		}
 
 		private double ComputeLunarAgeDays(double julianDay)
@@ -113,78 +325,6 @@ namespace AstroScope
 			int startSegment = (int)Math.Floor(Angle.NormalizeDegrees(startLon) / 30.0);
 			int endSegment = (int)Math.Floor(Angle.NormalizeDegrees(endLon) / 30.0);
 			return startSegment != endSegment;
-		}
-
-		private DateTime FindSetsubun(int year, double longitudeDegrees, TimeZoneInfo timeZone)
-		{
-			DateTime approxLocal = new DateTime(year, 2, 3, 0, 0, 0, DateTimeKind.Unspecified);
-			TimeSpan tzOffset = timeZone.GetUtcOffset(approxLocal);
-			double solarTimeHours = longitudeDegrees / 15.0;
-			double civilTimeHours = tzOffset.TotalHours;
-			double adjustment = solarTimeHours - civilTimeHours;
-			approxLocal = approxLocal.AddHours(adjustment);
-			approxLocal = TimeZoneInfo.ConvertTimeToUtc(approxLocal, timeZone);
-			DateTime start = approxLocal.AddDays(-1);
-			DateTime end = approxLocal.AddDays(2);
-
-			double target = 315.0;
-			DateTime best = approxLocal;
-			double bestDiff = double.MaxValue;
-			TimeSpan step = TimeSpan.FromHours(6);
-			DateTime current = start;
-			double prevDiff = Angle.WrapDegrees180(_ephemerisCalculator.GetPosition(PlanetId.Sun, current).EclipticLongitude - target);
-			while (current <= end)
-			{
-				DateTime next = current.Add(step);
-				if (next > end)
-				{
-					next = end;
-				}
-				double diff = Angle.WrapDegrees180(_ephemerisCalculator.GetPosition(PlanetId.Sun, next).EclipticLongitude - target);
-				if (prevDiff == 0 || prevDiff * diff <= 0)
-				{
-					best = RefineSolarLongitudeCrossing(current, next, target);
-					break;
-				}
-
-				if (Math.Abs(diff) < bestDiff)
-				{
-					bestDiff = Math.Abs(diff);
-					best = next;
-				}
-
-				current = next;
-				prevDiff = diff;
-			}
-
-			return TimeZoneInfo.ConvertTimeFromUtc(best, timeZone);
-		}
-
-		private DateTime RefineSolarLongitudeCrossing(DateTime start, DateTime end, double targetLongitude)
-		{
-			DateTime low = start;
-			DateTime high = end;
-			for (int i = 0; i < 20; i++)
-			{
-				DateTime mid = low + TimeSpan.FromTicks((high.Ticks - low.Ticks) / 2);
-				double diff = Angle.WrapDegrees180(_ephemerisCalculator.GetPosition(PlanetId.Sun, mid).EclipticLongitude - targetLongitude);
-				if (Math.Abs(diff) < 0.0001)
-				{
-					return mid;
-				}
-
-				double diffLow = Angle.WrapDegrees180(_ephemerisCalculator.GetPosition(PlanetId.Sun, low).EclipticLongitude - targetLongitude);
-				if (diffLow * diff <= 0)
-				{
-					high = mid;
-				}
-				else
-				{
-					low = mid;
-				}
-			}
-
-			return low + TimeSpan.FromTicks((high.Ticks - low.Ticks) / 2);
 		}
 
 		private int ComputeNineStarYear(int referenceYear)

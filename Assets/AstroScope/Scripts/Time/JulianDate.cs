@@ -2,12 +2,21 @@ using System;
 
 namespace AstroScope
 {
+	/// <summary>
+	/// Utility conversions between <see cref="DateTime"/> and astronomical Julian day numbers.
+	/// </summary>
 	public static class JulianDate
 	{
+		/// <summary>Julian day number at the J2000.0 epoch (2000-01-01 12:00 TT).</summary>
 		public const double J2000 = 2451545.0;
+
+		/// <summary>Number of days in a Julian century.</summary>
 		public const double JulianCentury = 36525.0;
+
+		/// <summary>Number of seconds in a Julian day.</summary>
 		public const double JulianDay = 86400.0;
 
+		/// <summary>Converts a UTC <see cref="DateTime"/> to a Julian day number.</summary>
 		public static double FromDateTime(DateTime dateTimeUtc)
 		{
 			if (dateTimeUtc.Kind != DateTimeKind.Utc)
@@ -38,16 +47,19 @@ namespace AstroScope
 			return jd;
 		}
 
+		/// <summary>Converts a Julian day number into centuries elapsed since J2000.0.</summary>
 		public static double ToJulianCenturies(double julianDay)
 		{
 			return (julianDay - J2000) / JulianCentury;
 		}
 
+		/// <summary>Returns the number of days elapsed since the J2000.0 epoch.</summary>
 		public static double DaysSinceJ2000(double julianDay)
 		{
 			return julianDay - J2000;
 		}
 
+		/// <summary>Converts a Julian day number back into a UTC <see cref="DateTime"/>.</summary>
 		public static DateTime ToDateTime(double julianDay)
 		{
 			double jd = julianDay + 0.5;

@@ -4,6 +4,9 @@ using UnityEngine;
 
 namespace AstroScope
 {
+	/// <summary>
+	/// Calculates heliocentric and geocentric ephemerides for the Sun, Moon, and major planets.
+	/// </summary>
 	public class EphemerisCalculator
 	{
 		private const double AstronomicalUnitKm = 149_597_870.7;
@@ -22,6 +25,7 @@ namespace AstroScope
 			PlanetId.Pluto
 		};
 
+		/// <summary>Computes ecliptic positions for all tracked bodies at the supplied UTC instant.</summary>
 		public IReadOnlyList<CelestialPosition> ComputeAll(DateTime dateTimeUtc)
 		{
 			var results = new List<CelestialPosition>(TrackedPlanets.Length);
@@ -33,6 +37,7 @@ namespace AstroScope
 			return results;
 		}
 
+		/// <summary>Retrieves the ecliptic longitude/latitude and distance for a single body.</summary>
 		public CelestialPosition GetPosition(PlanetId body, DateTime dateTimeUtc)
 		{
 			switch (body)
@@ -55,13 +60,7 @@ namespace AstroScope
 			double lambda = Angle.NormalizeDegrees(Angle.ToDegrees(Math.Atan2(sunVector.y, sunVector.x)));
 			double beta = Angle.ToDegrees(Math.Atan2(sunVector.z, Math.Sqrt(sunVector.x * sunVector.x + sunVector.y * sunVector.y)));
 			double distance = sunVector.magnitude;
-
-			return new CelestialPosition(
-				PlanetId.Sun,
-				lambda,
-				beta,
-				distance,
-				sunVector);
+			return CreatePosition(PlanetId.Sun, lambda, beta, distance, sunVector);
 		}
 
 		private CelestialPosition GetEarthPosition(DateTime dateTimeUtc)
@@ -69,12 +68,7 @@ namespace AstroScope
 			var earth = ComputeHeliocentricVector(PlanetId.Earth, dateTimeUtc);
 			double lambda = Angle.NormalizeDegrees(Angle.ToDegrees(Math.Atan2(earth.Heliocentric.y, earth.Heliocentric.x)));
 			double beta = Angle.ToDegrees(Math.Atan2(earth.Heliocentric.z, Math.Sqrt(earth.Heliocentric.x * earth.Heliocentric.x + earth.Heliocentric.y * earth.Heliocentric.y)));
-			return new CelestialPosition(
-				PlanetId.Earth,
-				lambda,
-				beta,
-				earth.Distance,
-				earth.Heliocentric);
+			return CreatePosition(PlanetId.Earth, lambda, beta, earth.Distance, earth.Heliocentric);
 		}
 
 		private CelestialPosition GetPlanetPosition(PlanetId body, DateTime dateTimeUtc)
@@ -86,7 +80,7 @@ namespace AstroScope
 			double beta = Angle.ToDegrees(Math.Atan2(geo.z, Math.Sqrt(geo.x * geo.x + geo.y * geo.y)));
 			double distance = Math.Sqrt(geo.x * geo.x + geo.y * geo.y + geo.z * geo.z);
 
-			return new CelestialPosition(body, lambda, beta, distance, geo);
+			return CreatePosition(body, lambda, beta, distance, geo);
 		}
 
 		private CelestialPosition GetMoonPosition(DateTime dateTimeUtc)
@@ -156,12 +150,20 @@ namespace AstroScope
 			double y = distanceAu * cosBeta * Math.Sin(lambdaRad);
 			double z = distanceAu * Math.Sin(betaRad);
 
-			return new CelestialPosition(
+			return CreatePosition(
 				PlanetId.Moon,
 				Angle.NormalizeDegrees(longitude),
 				latitude,
 				distanceAu,
 				new Vector3((float)x, (float)y, (float)z));
+		}
+
+		private static CelestialPosition CreatePosition(PlanetId body, double lambda, double beta, double distance, Vector3 vector)
+		{
+			double normalizedLongitude = Angle.NormalizeDegrees(lambda);
+			var sign = ZodiacUtility.GetSign(normalizedLongitude);
+			double degreesInSign = ZodiacUtility.GetDegreesInSign(normalizedLongitude);
+			return new CelestialPosition(body, normalizedLongitude, beta, distance, vector, sign, degreesInSign);
 		}
 
 		private (Vector3 Heliocentric, double Distance) ComputeHeliocentricVector(PlanetId planet, DateTime dateTimeUtc)
