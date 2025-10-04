@@ -42,10 +42,10 @@ namespace AstroScope
 			Debug.Log($"Ascendant: {western.Houses.AscendantDegrees:F2}°, Midheaven: {western.Houses.MidheavenDegrees:F2}°");
 
 			Debug.Log($"[AstroScope] Eastern Astrology");
-			Debug.Log($" - Lunisolar: {eastern.LunisolarDate.Year}年 {eastern.LunisolarDate.Month}月 {(eastern.LunisolarDate.IsLeapMonth ? "(閏) " : string.Empty)}{eastern.LunisolarDate.Day}日");
-			Debug.Log($" - Lunar Age: {eastern.LunarAgeDays:F2} days");
-			Debug.Log($" - Setsubun (local): {eastern.SetsubunLocal:u}");
-			Debug.Log($" - Nine Star Ki: Year={eastern.Chart.YearStar}, Month={eastern.Chart.MonthStar}, Day={eastern.Chart.DayStar}");
+			Debug.Log($" - Lunisolar(太陽太陰暦): {eastern.LunisolarDate.Year}年 {eastern.LunisolarDate.Month}月 {(eastern.LunisolarDate.IsLeapMonth ? "(閏) " : string.Empty)}{eastern.LunisolarDate.Day}日");
+			Debug.Log($" - LunarAge(月齢): {eastern.LunarAgeDays:F2} days");
+			Debug.Log($" - Setsubun(節分;local): {eastern.SetsubunLocal:u}");
+			Debug.Log($" - Nine Star Ki(九星気学): YearStar={eastern.Chart.YearStar}, MonthStar={eastern.Chart.MonthStar}, DayStar={eastern.Chart.DayStar}");
 		}
 
 		private TimeZoneInfo ResolveTimeZone()

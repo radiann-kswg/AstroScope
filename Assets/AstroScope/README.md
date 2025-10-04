@@ -37,6 +37,73 @@ DateTime localTime = new DateTime(2024, 2, 4, 12, 0, 0);
 var (western, eastern) = service.ComputeFull(localTime, 35.6895, 139.6917, timeZone);
 ```
 
+## Unity6 (Windows) での動作確認シーン
+
+### シーン構成例
+
+- `Assets/Scenes/AstroScopeDemo.unity` を新規作成し、以下の GameObject を配置します。
+  - `Directional Light` / `Main Camera` : Unity の既定オブジェクトをそのまま利用。
+  - `AstroScopeSystem` (Empty GameObject)
+  - `AstroScpoeMain` コンポーネントを追加。
+  - インスペクター設定値の例:
+    - `Latitude Degrees`: `35.6895`
+    - `Longitude Degrees`: `139.6917`
+    - `Time Zone Id`: **Windows では** `Tokyo Standard Time`（IANA 形式 `Asia/Tokyo` は例外で落ちるため要注意）
+    - `Compute On Start`: `true`
+  - `Canvas` (Screen Space - Overlay)
+  - `Panel` (Image) : 任意の背景色を設定し、幅 600px / 高さ 400px 程度の情報パネルを作成。
+    - `Button` (TextMeshPro 推奨) : `OnClick` に `AstroScopeSystem` の `AstroScpoeMain.ComputeAndLogHoroscopes` を登録して手動再計算を可能に。
+    - `Scroll View` (任意) : Console 出力を UI にも転記したい場合は、以下のサンプルを参考にログ集約用スクリプトを別途配置してください。
+
+```csharp
+// Assets/AstroScope/Scripts/UI/AstroScopeLogView.cs (任意で作成)
+using System.Text;
+using UnityEngine;
+using TMPro;
+
+public class AstroScopeLogView : MonoBehaviour
+{
+  [SerializeField] private TMP_Text target;
+  private readonly StringBuilder buffer = new();
+
+  private void OnEnable()
+  {
+    Application.logMessageReceived += HandleLog;
+  }
+
+  private void OnDisable()
+  {
+    Application.logMessageReceived -= HandleLog;
+  }
+
+  private void HandleLog(string condition, string stackTrace, LogType type)
+  {
+    if (type == LogType.Log && condition.StartsWith("[AstroScope]"))
+    {
+      buffer.AppendLine(condition);
+      if (target != null)
+      {
+        target.text = buffer.ToString();
+      }
+    }
+  }
+}
+```
+
+### 動作確認手順
+
+1. 上記シーンを保存して開いた状態で、`Window > General > Console` を表示。
+2. Play モードに入ると `Compute On Start` により即時に西洋 / 東洋の結果がログに出力されます。
+3. 出力例:
+   - `[AstroScope] Western Horoscope for 2025-02-04 03:00:00Z`
+   - `[AstroScope] Eastern Astrology` など各計算結果が列挙されます。
+4. 値を変更したい場合は Play 中に緯度・経度・タイムゾーンを編集し、`Button` から再計算。
+
+### 補足
+
+- `Time Zone Id` は Windows と macOS で名称が異なります。Windows: `Tokyo Standard Time` / macOS: `Asia/Tokyo`。他地域でも Windows のタイムゾーン ID 一覧を確認し、例外発生時はログに表示されるフォールバックメッセージを参考に修正してください。
+- エディットモードテストは `Test Runner (Window > General > Test Runner)` の `Edit Mode` タブから `AstroScope/Tests/EditMode` 配下を実行できます。
+
 ## テスト(Mac 環境)
 
 Unity Test Runner の Edit Mode で `AstroScope/Tests/EditMode/AstroScopeCalculatorTests` を実行してください。コマンドライン実行例 (Unity エディターインストール済みの場合):
