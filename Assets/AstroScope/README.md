@@ -12,17 +12,17 @@ This module provides reusable services for Western horoscope (zodiac + houses) a
 
 ## 主なスクリプト
 
-| ファイル | 役割 |
-| --- | --- |
-| `Scripts/Math/Angle.cs` | 角度計算ユーティリティ。 |
-| `Scripts/Time/JulianDate.cs` | 日時とユリウス日 JD/Century 変換。 |
-| `Scripts/Core/EphemerisCalculator.cs` | 惑星・太陽・月の位置計算。 |
-| `Scripts/Western/HouseCalculator.cs` | 等ハウス方式のハウス計算。 |
-| `Scripts/Western/WesternHoroscopeCalculator.cs` | 西洋ホロスコープ統合。 |
-| `Scripts/Eastern/EasternAstrologyCalculator.cs` | 太陰太陽暦と九星気学の算出。 |
-| `Scripts/Core/AstroScopeService.cs` | 西洋/東洋結果をまとめて提供。 |
-| `AstroScpoeMain.cs` | サンプル Monobehaviour。 |
-| `Tests/EditMode/AstroScopeCalculatorTests.cs` | NUnit ベースの検証テスト。 |
+| ファイル                                        | 役割                               |
+| ----------------------------------------------- | ---------------------------------- |
+| `Scripts/Math/Angle.cs`                         | 角度計算ユーティリティ。           |
+| `Scripts/Time/JulianDate.cs`                    | 日時とユリウス日 JD/Century 変換。 |
+| `Scripts/Core/EphemerisCalculator.cs`           | 惑星・太陽・月の位置計算。         |
+| `Scripts/Western/HouseCalculator.cs`            | 等ハウス方式のハウス計算。         |
+| `Scripts/Western/WesternHoroscopeCalculator.cs` | 西洋ホロスコープ統合。             |
+| `Scripts/Eastern/EasternAstrologyCalculator.cs` | 太陰太陽暦と九星気学の算出。       |
+| `Scripts/Core/AstroScopeService.cs`             | 西洋/東洋結果をまとめて提供。      |
+| `AstroScpoeMain.cs`                             | サンプル Monobehaviour。           |
+| `Tests/EditMode/AstroScopeCalculatorTests.cs`   | NUnit ベースの検証テスト。         |
 
 ## 利用方法
 
@@ -37,7 +37,7 @@ DateTime localTime = new DateTime(2024, 2, 4, 12, 0, 0);
 var (western, eastern) = service.ComputeFull(localTime, 35.6895, 139.6917, timeZone);
 ```
 
-## テスト
+## テスト(Mac 環境)
 
 Unity Test Runner の Edit Mode で `AstroScope/Tests/EditMode/AstroScopeCalculatorTests` を実行してください。コマンドライン実行例 (Unity エディターインストール済みの場合):
 
