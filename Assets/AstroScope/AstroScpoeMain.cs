@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using Unity.VisualScripting;
 using UnityEngine;
 
 namespace AstroScope
@@ -26,6 +27,9 @@ namespace AstroScope
 
 		private readonly AstroScopeService _service = new();
 
+		[SerializeField]
+		private AstroScopeCelestialPreview CelestialPreview;
+
 		private void Start()
 		{
 			if (computeOnStart)
@@ -47,6 +51,11 @@ namespace AstroScope
 				string planetName = AstroLocalization.GetPlanetName(body.Body, language);
 				string signName = AstroLocalization.GetZodiacName(body.Sign, language);
 				Debug.Log($" - {planetName} ({signName} {body.DegreesInSign:F2}°): λ={body.EclipticLongitude:F2}°, β={body.EclipticLatitude:F2}°, Δ={body.DistanceAstronomicalUnits:F4} AU");
+
+				if (CelestialPreview)
+				{
+					CelestialPreview.CelestialBodiesObject[(int)body.Body].transform.Translate(Quaternion.Euler(0.0f, (float)body.EclipticLongitude, (float)body.EclipticLatitude) * new Vector3((float)body.DistanceAstronomicalUnits, 0.0f, 0.0f) * 42f);
+				}
 			}
 
 			string ascLabel = AstroLocalization.GetAscendantLabel(language);
