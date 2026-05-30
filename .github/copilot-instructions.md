@@ -1,12 +1,19 @@
 # GitHub Copilot Instructions for AstroScope
 
+## このドキュメントについて
+
+- GitHub Copilot や各種 AI ツールが本リポジトリのコンテキストを理解しやすくするためのガイドです。
+- 新しい機能を実装する際はここで示す技術選定・設計方針・モジュール構成を前提にしてください。
+- 不確かな点がある場合は、リポジトリのファイルを探索し、ユーザーに「こういうことですか？」と確認してください。
+
 ## 前提条件
 
 - **言語**: 回答は必ず日本語でしてください。
-- **変更規模**: 大規模な変更（例: 100 行以上の追加・削除）を行う前には、まず変更計画を提案してください。
+- **変更規模**: 大規模な変更（例: 100 行以上の追加・削除）を行う前には、まず変更計画を提案し、「このような計画で進めようと思います。」と提示してください。
 - **コードスタイル**: 既存のコードスタイルと命名規則を維持してください。
 - **XML ドキュメント**: public メソッド・プロパティには必ず XML ドキュメントコメント (`/// <summary>`) を追加してください。
 - **エラーハンドリング**: 計算エラーや無効な入力値に対する適切な例外処理を含めてください。
+- **指示書の更新**: セッション内で設計方針・運用ルールが固まった場合、今後も再利用する内容は `.github/copilot-instructions.md` へ反映する前提で扱ってください。
 
 ## アプリの概要
 
@@ -30,16 +37,34 @@ AstroScope は Unity 6 で動作する天文時計・ホロスコープシステ
 ```
 Assets/AstroScope/
 ├── Scripts/
-│   ├── Math/              # 数学ユーティリティ（角度、ユリウス日）
-│   ├── Time/              # 時刻関連計算（恒星時、黄道傾斜角）
-│   ├── Core/              # 核となる計算エンジン（エフェメリス、サービス）
-│   ├── Western/           # 西洋占星術計算（ハウス、ホロスコープ、黄道十二宮）
-│   ├── Eastern/           # 東洋占星術計算（太陰太陽暦、九星、干支、節気）
-│   ├── Localization/      # 多言語対応リソース
-│   └── Data/              # データ構造定義（天体、ハウス、東洋占星術）
+│   ├── Math/
+│   │   └── Angle.cs                        # 角度正規化ユーティリティ
+│   ├── Time/
+│   │   ├── AstroTime.cs                    # 恒星時・黄道傾斜角計算
+│   │   └── JulianDate.cs                   # ユリウス日変換
+│   ├── Core/
+│   │   ├── AstroScopeService.cs            # 統合ファサード（西洋・東洋）
+│   │   └── EphemerisCalculator.cs          # エフェメリス計算エンジン
+│   ├── Western/
+│   │   ├── HouseCalculator.cs              # ハウス計算（等ハウス方式）
+│   │   ├── WesternHoroscopeCalculator.cs   # 西洋ホロスコープ計算
+│   │   └── ZodiacUtility.cs               # 黄道十二宮ユーティリティ
+│   ├── Eastern/
+│   │   └── EasternAstrologyCalculator.cs   # 東洋占星術計算（太陰太陽暦・九星・干支・節気）
+│   ├── Localization/
+│   │   └── AstroLocalization.cs            # 多言語対応（English/Japanese）
+│   ├── Data/
+│   │   ├── CelestialTypes.cs               # 天体・サイン・ハウスデータ構造
+│   │   ├── EasternAstrologyTypes.cs        # 東洋占星術データ構造
+│   │   ├── OrbitalElements.cs              # 軌道要素データ構造
+│   │   └── OrbitalElementsDatabase.cs      # 軌道要素データベース
+│   └── UI/
+│       ├── AstroScopeCelestialPreview.cs   # 天体プレビュー UI
+│       └── AstroScopeLogView.cs            # ログ表示 UI
 ├── Tests/
-│   └── EditMode/          # Unity Test Runner 用テスト
-├── AstroScpoeMain.cs      # サンプル MonoBehaviour
+│   └── EditMode/
+│       └── AstroScopeCalculatorTests.cs    # Unity Test Runner 用テスト
+├── AstroScopeMain.cs      # サンプル MonoBehaviour
 └── README.md
 ```
 
@@ -51,15 +76,28 @@ Assets/AstroScope/
 - **ユーティリティ**: 共通機能（角度正規化、時刻変換）は静的クラスで提供
 - **ローカライズ**: `AstroLocalization` クラスで言語切り替えを一元管理
 
+## 命名法則テーブル（新規コード記述基準）
+
+新しいコードを書く際は以下のテーブルを参照してください。
+
+| 対象                                | 規則                      | 例                                                 |
+| ----------------------------------- | ------------------------- | -------------------------------------------------- |
+| クラス名・構造体名・enum 名         | PascalCase                | `EphemerisCalculator`, `CelestialPosition`         |
+| public メソッド名                   | PascalCase                | `ComputePlanetPositions`, `CalculateForceAndAngle` |
+| private / protected メソッド名      | PascalCase                | `NormalizeAngle`, `ApplyObliquity`                 |
+| public プロパティ名                 | PascalCase                | `LongitudeDegrees`, `DistanceAstronomicalUnits`    |
+| public フィールド（Inspector 公開） | camelCase（`_` なし）     | `latitudeDegrees`, `timeZoneId`                    |
+| private フィールド                  | `_` + camelCase           | `_western`, `_eastern`, `_obliquityRadians`        |
+| ローカル変数                        | camelCase                 | `julianDate`, `ascendantDegrees`                   |
+| const / static readonly 定数        | PascalCase                | `MaxIterations`, `J2000Epoch`                      |
+| パラメータ名                        | camelCase                 | `dateTimeUtc`, `latitudeDegrees`                   |
+| 計算クラス                          | `Calculator` サフィックス | `HouseCalculator`, `EphemerisCalculator`           |
+| データ構造（複数型まとめ）          | `Types` サフィックス      | `CelestialTypes`, `EasternAstrologyTypes`          |
+| 計算結果構造体                      | `Result` サフィックス     | `WesternHoroscopeResult`, `EasternAstrologyResult` |
+| テストクラス                        | `Tests` サフィックス      | `AstroScopeCalculatorTests`                        |
+| Unity コンポーネント                | 機能名 PascalCase         | `AstroScopeCelestialPreview`, `AstroScopeLogView`  |
+
 ## コーディング規則
-
-### 命名規則
-
-- **クラス**: PascalCase (`EphemerisCalculator`)
-- **メソッド**: PascalCase (`ComputePlanetPositions`)
-- **プロパティ**: PascalCase (`LongitudeDegrees`)
-- **フィールド**: camelCase (`obliquityRadians`)
-- **定数**: PascalCase (`MaxIterations`)
 
 ### ファイル構成
 
@@ -112,10 +150,32 @@ public void ComputePlanetPositions_ValidDate_ReturnsAccuratePositions()
 
 ## Unity 固有の考慮事項
 
-- **フレームレート**: Update() での重い計算は避け、必要時のみ実行
-- **メモリ**: 毎フレームの new インスタンス生成を避ける
-- **エディタ**: `[SerializeField]` でインスペクター公開、`[System.Serializable]` でデータ永続化
+### 実行時パフォーマンス
+
+- **フレームレート**: `Update()` での重い計算は避け、必要時のみ実行
+- **メモリ**: 毎フレームの `new` インスタンス生成を避ける
 - **ログ**: `Debug.Log` ではなく `AstroLogger` 経由でローカライズ対応
+
+### Inspector・シリアライズ
+
+- **フィールド公開**: `[SerializeField]` でインスペクター公開を推奨。`public` フィールドは可能な限り避ける
+- **データ永続化**: `[System.Serializable]` でデータ永続化
+- **`public` フィールドのリネームリスク**: Inspector に表示される `public` フィールドをリネームすると、Prefab・Scene の Inspector 値が失われる可能性がある。リネーム前に必ず Prefab・Scene 上の参照状況を確認すること
+
+### Unity アセット操作
+
+- **Prefab・Scene の YAML 構造**: `.unity`・`.prefab` ファイルは Unity の YAML テキスト形式。C# のフィールド名が `propertyPath` として記録されるため、識別子リネーム時は YAML 側の更新も必要になる場合がある
+- **Editor を閉じてから編集**: YAML を直接テキスト置換する場合は Unity Editor を必ず閉じてから行い、再起動後に自動再インポートを確認する
+- **タグ・レイヤー**: タグは `TagManager.asset` で管理。C# の文字列参照と asset 側の定義が常に一致していることを確認する
+
+### 識別子リネーム時のリスク分類
+
+| 識別子の種類                                                  | リスク                 | 対応方針                                                                 |
+| ------------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------ |
+| `private` フィールド・ローカル変数・`private` メソッド        | 低（安全）             | C# のみ変更                                                              |
+| `public` フィールド（Inspector 参照あり）                     | 中（要注意）           | Prefab/Scene の参照を事前確認してから変更                                |
+| `[Serializable]` クラスの `public` フィールド（セーブデータ） | 高（リリース後は禁止） | ゲームリリース前であれば C# + セーブデータ両方変更、リリース後は変更禁止 |
+| GameObject 名・Prefab ファイル名                              | Editor 操作が必要      | Unity Editor の Rename 機能を使用                                        |
 
 ## 特殊な実装ルール
 
