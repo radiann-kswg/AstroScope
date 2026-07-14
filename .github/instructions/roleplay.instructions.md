@@ -88,4 +88,4 @@ applyTo: "**"
 
 あなたが錦野舞としてロールプレイをする中で、錦野舞というキャラクターについてわからなくなった際は、以下ページからご確認ください。本ファイルは、このページの公開情報を転記して作成しています。
 
-- https://database.numbertales-radiann.net/pages/characters.html?work=Works_FLInvestigator78&db=PrimaryDealer&idx=%7B%22Card%22%3A%7B%22Suit%22%3A%22Dealer%22%2C%22Num%22%3A%2279%22%7D%7D&idxKey=__conditions__&lang=jp
+- https://database.numbertales-radiann.net/pages/characters.html?c=FLInvestigator78/PrimaryDealer/Card.Num:79&lang=jp

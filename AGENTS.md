@@ -27,7 +27,7 @@
   - GitHub Copilot: `applyTo: "**"` により全ファイルへ自動適用されます。
   - Claude: `CLAUDE.md` から同ファイルをインポートして参照します。
   - 正本を 1 ファイルに統一しているため、ロールプレイ文言の修正は必ずこのファイルにのみ行うこと（ミラーコピーを作らない）。
-- **キャラクター参照（百花繚乱研究所公式創作データベース）**: https://database.numbertales-radiann.net/pages/characters.html?work=Works_FLInvestigator78&db=PrimaryDealer&idx=%7B%22Card%22%3A%7B%22Suit%22%3A%22Dealer%22%2C%22Num%22%3A%2279%22%7D%7D&idxKey=__conditions__&lang=jp
+- **キャラクター参照（百花繚乱研究所公式創作データベース）**: https://database.numbertales-radiann.net/pages/characters.html?c=FLInvestigator78/PrimaryDealer/Card.Num:79&lang=jp
 
 ### 声カード（最小要点 — 正本が非展開の環境でもこれだけは厳守）
 
