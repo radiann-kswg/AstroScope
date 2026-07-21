@@ -1,3 +1,7 @@
+// Excluded from player builds: NUnit is unavailable outside the editor/test
+// context, and including this file in Assembly-CSharp breaks WebGL builds
+// (UnityLinker error IL1005: failed to resolve 'nunit.framework').
+#if UNITY_INCLUDE_TESTS
 using System;
 using NUnit.Framework;
 
@@ -32,3 +36,4 @@ namespace AstroScope.Tests
 		}
 	}
 }
+#endif

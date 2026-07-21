@@ -16,6 +16,10 @@ namespace AstroScope
 		private const string FallbackUnlitShaderName = "Unlit/Color";
 		private const int SoftCircleTextureSize = 64;
 		private const int LabelFontRequestSize = 48;
+		private const string LitTemplateResource = "CosmicTemplates/CosmicLitTemplate";
+		private const string UnlitTemplateResource = "CosmicTemplates/CosmicUnlitTemplate";
+		private const string AdditiveTemplateResource = "CosmicTemplates/CosmicAdditiveTemplate";
+		private const string LabelFontResource = "Fonts/AstroScopeLabelFont";
 
 		private static readonly string[] JapaneseOsFontNames =
 		{
@@ -37,6 +41,15 @@ namespace AstroScope
 		{
 			if (_labelFont != null)
 			{
+				return _labelFont;
+			}
+
+			// Prefer the embedded font: OS fonts are unavailable on WebGL builds
+			// (unityroom), and the built-in fallback lacks Japanese glyphs.
+			Font embeddedFont = Resources.Load<Font>(LabelFontResource);
+			if (embeddedFont != null)
+			{
+				_labelFont = embeddedFont;
 				return _labelFont;
 			}
 
@@ -116,13 +129,18 @@ namespace AstroScope
 		/// <returns>Configured material instance.</returns>
 		public static Material CreateLitMaterial(Color baseColor)
 		{
-			Shader shader = Shader.Find(UrpLitShaderName);
-			if (shader == null)
+			Material material = InstantiateTemplate(LitTemplateResource);
+			if (material == null)
 			{
-				shader = Shader.Find(FallbackLitShaderName);
+				Shader shader = Shader.Find(UrpLitShaderName);
+				if (shader == null)
+				{
+					shader = Shader.Find(FallbackLitShaderName);
+				}
+
+				material = new Material(shader);
 			}
 
-			var material = new Material(shader);
 			SetBaseColor(material, baseColor);
 			return material;
 		}
@@ -134,13 +152,18 @@ namespace AstroScope
 		/// <returns>Configured material instance.</returns>
 		public static Material CreateUnlitMaterial(Color color)
 		{
-			Shader shader = Shader.Find(UrpUnlitShaderName);
-			if (shader == null)
+			Material material = InstantiateTemplate(UnlitTemplateResource);
+			if (material == null)
 			{
-				shader = Shader.Find(FallbackUnlitShaderName);
+				Shader shader = Shader.Find(UrpUnlitShaderName);
+				if (shader == null)
+				{
+					shader = Shader.Find(FallbackUnlitShaderName);
+				}
+
+				material = new Material(shader);
 			}
 
-			var material = new Material(shader);
 			SetBaseColor(material, color);
 			return material;
 		}
@@ -153,14 +176,19 @@ namespace AstroScope
 		/// <returns>Configured material instance.</returns>
 		public static Material CreateAdditiveMaterial(Color tint, bool useSoftTexture)
 		{
-			Shader shader = Shader.Find(AdditiveShaderName);
-			if (shader == null)
+			Material material = InstantiateTemplate(AdditiveTemplateResource);
+			if (material == null)
 			{
-				// Fallback keeps the scene functional even if the custom shader has not imported yet.
-				return CreateUnlitMaterial(tint);
+				Shader shader = Shader.Find(AdditiveShaderName);
+				if (shader == null)
+				{
+					// Fallback keeps the scene functional even if the custom shader has not imported yet.
+					return CreateUnlitMaterial(tint);
+				}
+
+				material = new Material(shader);
 			}
 
-			var material = new Material(shader);
 			material.SetColor("_TintColor", tint);
 			if (useSoftTexture)
 			{
@@ -364,6 +392,20 @@ namespace AstroScope
 			captionRect.offsetMax = Vector2.zero;
 			caption.text = label;
 			return button;
+		}
+
+		/// <summary>
+		/// Instantiates a copy of a template material stored under Resources.
+		/// The template assets guarantee that the shaders (and their variants)
+		/// used by runtime-generated materials are included in player builds,
+		/// where <c>Shader.Find</c> alone would fail after shader stripping.
+		/// </summary>
+		/// <param name="resourcePath">Resources path of the template material.</param>
+		/// <returns>Independent material copy, or null when the template is missing.</returns>
+		private static Material InstantiateTemplate(string resourcePath)
+		{
+			Material template = Resources.Load<Material>(resourcePath);
+			return template == null ? null : new Material(template);
 		}
 
 		private static void SetBaseColor(Material material, Color color)

@@ -6,8 +6,11 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/Scenes/SampleScene.unity
-    guid: 99c9720ab356a0642a771bea13969a05
+    path: Assets/AstroScope/Scene/Cosmic/AstroScope_WesternCosmic.unity
+    guid: 3ec2799f91714244cb058235c2555ab7
+  - enabled: 1
+    path: Assets/AstroScope/Scene/Cosmic/AstroScope_EasternCosmic.unity
+    guid: 74a050ae0be92914ba526c64242556b6
   m_configObjects:
     com.unity.dt.app-ui: {fileID: 11400000, guid: 1b1c20d82303e4b5781c3ef50ac1449f, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
