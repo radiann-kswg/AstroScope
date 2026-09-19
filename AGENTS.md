@@ -96,7 +96,7 @@ Assets/AstroScope/
 │       ├── AstroScopeCelestialPreview.cs   # 天体プレビュー UI
 │       └── AstroScopeLogView.cs            # ログ表示 UI
 ├── Tests/
-│   └── EditMode/
+│   └── Editor/                         # Editor アセンブリ（asmdef 無しで Edit Mode に表示させるため）
 │       └── AstroScopeCalculatorTests.cs    # Unity Test Runner 用テスト
 ├── AstroScopeMain.cs      # サンプル MonoBehaviour
 └── README.md
@@ -153,7 +153,7 @@ Assets/AstroScope/
 
 - **フレームワーク**: Unity Test Runner (Edit Mode)
 - **テストファイル**: `*Tests.cs` の命名規則
-- **配置**: `Assets/AstroScope/Tests/EditMode/`
+- **配置**: `Assets/AstroScope/Tests/Editor/`
 - **カバレッジ**: 公開 API の主要パスを網羅
 - **テストデータ**: 既知の天体位置（2025 年基準）で検証
 
@@ -216,8 +216,15 @@ public void ComputePlanetPositions_ValidDate_ReturnsAccuratePositions()
 ### 天文計算
 
 - **精度**: Meeus "Astronomical Algorithms" 第 2 版の係数を使用
-- **座標系**: J2000.0 基準の黄道座標系
+- **座標系**: 黄道座標系。軌道要素は J2000.0 基準で、黄経は一般歳差で日付の平均分点に直す（2026-09-19 修正。章動・光行差は未補正で誤差 ≈ 0.01°）
 - **時刻系**: UTC ベースでローカル時刻との変換を明示
+
+### 東洋占星術の暦法（2026-09-19 決定）
+
+- **旧暦（太陰太陽暦）の置閏**: 時憲暦式の一般規則で機械的に決める。冬至を含む朔望月を必ず 11 月とし、冬至月から次の冬至月までが 13 か月のときだけ、その間で最初に中気（太陽黄経が 30° の倍数）を含まない月を閏月とする。これにより **旧暦 2033 年問題は「冬至優先案」（2033 年 閏11月、2034 年正月 = 2/19）** に落ち、特別扱いのコードは置かない（日本カレンダー暦文化振興協会の見解・市販の万年暦・.NET `JapaneseLunisolarCalendar` の表と一致）。
+- **暦日の境界**: 朔日・中気の判定は `Compute` に渡された `TimeZoneInfo` の暦日（現地の日付）で行う（JST 固定にしない）。
+- **月干支・九星の月盤は節月（節気で区切る月）で決める**: 立春〜啓蟄を寅月とし、節入りの瞬間（太陽黄経）で切り替える。月干は五虎遁（甲己年 → 丙寅月）、月盤は年盤の 一四七/二五八/三六九 で寅月を 八白/五黄/二黒 とし毎月ひとつずつ下がる。旧暦月とは独立。
+- **未対応（別件）**: 日家九星の陰遁・陽遁の切り替えは未実装。
 
 ### ローカライズ
 

@@ -49,10 +49,10 @@ namespace AstroScope
 			DateTime dateTimeUtc = TimeZoneInfo.ConvertTimeToUtc(dateTimeLocal, timeZone);
 			double julianDay = JulianDate.FromDateTime(dateTimeUtc);
 			double lunarAge = ComputeLunarAgeDays(julianDay);
-			var (prevNewMoon, nextNewMoon) = GetBoundingNewMoons(julianDay);
-			var lunisolarDate = BuildLunisolarDate(julianDay, prevNewMoon, nextNewMoon);
 
 			var solarTermCache = BuildSolarTermCache(dateTimeLocal.Year, longitudeDegrees, timeZone);
+			var lunisolarDate = BuildLunisolarDate(dateTimeLocal, solarTermCache, timeZone);
+			int solarMonthIndex = ComputeSolarMonthIndex(dateTimeUtc);
 			var currentLichun = solarTermCache[(dateTimeLocal.Year, SolarTermId.StartOfSpring)];
 			var previousLichun = solarTermCache[(dateTimeLocal.Year - 1, SolarTermId.StartOfSpring)];
 
@@ -64,10 +64,10 @@ namespace AstroScope
 			int referenceYear = afterCurrentLichun ? dateTimeLocal.Year : dateTimeLocal.Year - 1;
 
 			int yearStar = ComputeNineStarYear(referenceYear);
-			int monthStar = ComputeNineStarMonth(yearStar, lunisolarDate.Month);
+			int monthStar = ComputeNineStarMonth(yearStar, solarMonthIndex);
 			int dayStar = ComputeNineStarDay(julianDay);
 
-			var sexagenary = ComputeSexagenary(referenceYear, lunisolarDate.Month, julianDay);
+			var sexagenary = ComputeSexagenary(referenceYear, solarMonthIndex, julianDay);
 			var solarTermsForYear = GetSolarTermsForYear(dateTimeLocal.Year, solarTermCache);
 			var doyouPeriods = ComputeDoyouPeriods(dateTimeLocal.Year, solarTermCache, timeZone);
 
@@ -163,14 +163,14 @@ namespace AstroScope
 			};
 		}
 
-		private static SexagenaryDate ComputeSexagenary(int referenceYear, int lunisolarMonth, double julianDay)
+		/// <param name="solarMonthIndex">節月 (1 = 寅月). Month stem follows 五虎遁: 甲己年 → 丙寅月.</param>
+		private static SexagenaryDate ComputeSexagenary(int referenceYear, int solarMonthIndex, double julianDay)
 		{
 			int yearStemIndex = Mod(referenceYear - 4, 10);
 			int yearBranchIndex = Mod(referenceYear - 4, 12);
 
-			int monthIndex = lunisolarMonth <= 0 ? 1 : lunisolarMonth;
-			int monthStemIndex = Mod(yearStemIndex * 2 + monthIndex - 1, 10);
-			int monthBranchIndex = Mod(monthIndex + 1, 12);
+			int monthStemIndex = Mod(yearStemIndex * 2 + solarMonthIndex + 1, 10);
+			int monthBranchIndex = Mod(solarMonthIndex + 1, 12);
 
 			int julianDayNumber = (int)Math.Floor(julianDay + 0.5);
 			int dayStemIndex = Mod(julianDayNumber + 9, 10);
@@ -283,48 +283,101 @@ namespace AstroScope
 			return (prev, next);
 		}
 
-		private LunisolarDate BuildLunisolarDate(double julianDay, double prevNewMoon, double nextNewMoon)
+		/// <summary>
+		/// Builds the 旧暦 (天保暦) date with the 時憲暦-style placement rule: the lunar month containing the
+		/// winter solstice is always month 11, and when 13 lunar months separate consecutive solstice months
+		/// the first month without a principal term (中気) is the leap month. This yields 閏11月 for the
+		/// 旧暦 2033 年問題 (冬至優先案) without any special case. Day boundaries follow the local calendar date.
+		/// </summary>
+		private LunisolarDate BuildLunisolarDate(DateTime dateTimeLocal, Dictionary<(int, SolarTermId), SolarTermEntry> cache, TimeZoneInfo timeZone)
 		{
-			int day = (int)Math.Floor(julianDay - prevNewMoon) + 1;
-			int monthIndex = ComputeLunisolarMonthIndex(julianDay, prevNewMoon, nextNewMoon);
+			DateTime date = dateTimeLocal.Date;
+			long k = LunationContaining(date, timeZone);
 
-			bool hasPrincipalTerm = HasPrincipalTerm(prevNewMoon, nextNewMoon);
+			// Most recent winter solstice whose lunar month starts on or before this one (cache covers year-1..year+1).
+			int solsticeYear = dateTimeLocal.Year;
+			long kSolstice = LunationContaining(cache[(solsticeYear, SolarTermId.WinterSolstice)].DateTimeLocal.Date, timeZone);
+			if (kSolstice > k)
+			{
+				solsticeYear--;
+				kSolstice = LunationContaining(cache[(solsticeYear, SolarTermId.WinterSolstice)].DateTimeLocal.Date, timeZone);
+			}
+			long kNextSolstice = LunationContaining(cache[(solsticeYear + 1, SolarTermId.WinterSolstice)].DateTimeLocal.Date, timeZone);
 
-			var prevDate = JulianDate.ToDateTime(prevNewMoon);
-			int lunisolarYear = prevDate.Month >= 11 ? prevDate.Year + 1 : prevDate.Year;
+			long? leapLunation = null;
+			if (kNextSolstice - kSolstice == 13)
+			{
+				for (long j = kSolstice + 1; j < kNextSolstice; j++)
+				{
+					if (!HasPrincipalTerm(j, timeZone))
+					{
+						leapLunation = j;
+						break;
+					}
+				}
+			}
 
+			int offset = (int)(k - kSolstice);
+			if (leapLunation.HasValue && k >= leapLunation.Value)
+			{
+				offset--;
+			}
+
+			int month = Mod(11 + offset - 1, 12) + 1;
 			return new LunisolarDate
 			{
-				Year = lunisolarYear,
-				Month = monthIndex,
-				Day = day,
-				IsLeapMonth = !hasPrincipalTerm
+				Year = solsticeYear + (month >= 11 ? 0 : 1),
+				Month = month,
+				Day = (date - LunationStartDate(k, timeZone)).Days + 1,
+				IsLeapMonth = leapLunation == k
 			};
 		}
 
-		private int ComputeLunisolarMonthIndex(double julianDay, double prevNewMoon, double nextNewMoon)
+		/// <summary>Index of the lunation (new-moon count from the epoch) whose calendar month contains <paramref name="localDate"/>.</summary>
+		private long LunationContaining(DateTime localDate, TimeZoneInfo timeZone)
 		{
-			double midPoint = (prevNewMoon + nextNewMoon) * 0.5;
-			DateTime midDate = JulianDate.ToDateTime(midPoint);
-			double sunLongitude = _ephemerisCalculator.GetPosition(PlanetId.Sun, midDate).EclipticLongitude;
-			int segment = (int)Math.Floor(Angle.NormalizeDegrees(sunLongitude) / 30.0);
-			int month = ((segment + 1) % 12) + 1;
-
-			if (!HasPrincipalTerm(prevNewMoon, nextNewMoon))
+			double jd = JulianDate.FromDateTime(LocalMidnightUtc(localDate, timeZone));
+			long k = (long)Math.Floor((jd - NewMoonEpochJd) / SynodicMonth);
+			while (LunationStartDate(k, timeZone) > localDate)
 			{
-				return month;
+				k--;
 			}
-
-			return month;
+			while (LunationStartDate(k + 1, timeZone) <= localDate)
+			{
+				k++;
+			}
+			return k;
 		}
 
-		private bool HasPrincipalTerm(double startJd, double endJd)
+		/// <summary>Local calendar date (朔日) on which lunation <paramref name="k"/> begins.</summary>
+		private DateTime LunationStartDate(long k, TimeZoneInfo timeZone)
 		{
-			double startLon = _ephemerisCalculator.GetPosition(PlanetId.Sun, JulianDate.ToDateTime(startJd + 0.5)).EclipticLongitude;
-			double endLon = _ephemerisCalculator.GetPosition(PlanetId.Sun, JulianDate.ToDateTime(endJd - 0.5)).EclipticLongitude;
-			int startSegment = (int)Math.Floor(Angle.NormalizeDegrees(startLon) / 30.0);
-			int endSegment = (int)Math.Floor(Angle.NormalizeDegrees(endLon) / 30.0);
-			return startSegment != endSegment;
+			return TimeZoneInfo.ConvertTimeFromUtc(JulianDate.ToDateTime(TrueNewMoon(k)), timeZone).Date;
+		}
+
+		/// <summary>True when a principal term (中気: solar longitude at a multiple of 30°) falls on a calendar day of lunation <paramref name="k"/>.</summary>
+		private bool HasPrincipalTerm(long k, TimeZoneInfo timeZone)
+		{
+			return PrincipalTermSegment(LunationStartDate(k, timeZone), timeZone)
+				!= PrincipalTermSegment(LunationStartDate(k + 1, timeZone), timeZone);
+		}
+
+		private int PrincipalTermSegment(DateTime localDate, TimeZoneInfo timeZone)
+		{
+			double longitude = _ephemerisCalculator.GetPosition(PlanetId.Sun, LocalMidnightUtc(localDate, timeZone)).EclipticLongitude;
+			return (int)Math.Floor(Angle.NormalizeDegrees(longitude) / 30.0);
+		}
+
+		private static DateTime LocalMidnightUtc(DateTime localDate, TimeZoneInfo timeZone)
+		{
+			return TimeZoneInfo.ConvertTimeToUtc(DateTime.SpecifyKind(localDate.Date, DateTimeKind.Unspecified), timeZone);
+		}
+
+		/// <summary>節月 index (1 = 寅月 from 立春 … 12 = 丑月 from 小寒), switching at the exact solar-term instant.</summary>
+		private int ComputeSolarMonthIndex(DateTime dateTimeUtc)
+		{
+			double longitude = _ephemerisCalculator.GetPosition(PlanetId.Sun, dateTimeUtc).EclipticLongitude;
+			return (int)Math.Floor(Angle.NormalizeDegrees(longitude - 315.0) / 30.0) + 1;
 		}
 
 		private int ComputeNineStarYear(int referenceYear)
@@ -347,10 +400,10 @@ namespace AstroScope
 			return star;
 		}
 
-		private int ComputeNineStarMonth(int yearStar, int monthIndex)
+		private static int ComputeNineStarMonth(int yearStar, int solarMonthIndex)
 		{
-			int star = (yearStar + monthIndex + 6) % 9;
-			return star == 0 ? 9 : star;
+			int tigerMonthStar = 8 - 3 * ((yearStar - 1) % 3); // 一四七 → 八白, 二五八 → 五黄, 三六九 → 二黒
+			return Mod(tigerMonthStar - solarMonthIndex, 9) + 1;
 		}
 
 		private int ComputeNineStarDay(double julianDay)

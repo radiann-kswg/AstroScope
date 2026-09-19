@@ -24,7 +24,7 @@ This module provides reusable services for Western horoscope (zodiac + houses) a
 | `Scripts/Localization/AstroLocalization.cs`     | 英語/日本語ローカライズ用リソース。              |
 | `Scripts/Core/AstroScopeService.cs`             | 西洋/東洋結果をまとめて提供。                    |
 | `AstroScpoeMain.cs`                             | サンプル Monobehaviour。                         |
-| `Tests/EditMode/AstroScopeCalculatorTests.cs`   | NUnit ベースの検証テスト。                       |
+| `Tests/Editor/AstroScopeCalculatorTests.cs`   | NUnit ベースの検証テスト。                       |
 
 ## 利用方法
 
@@ -141,11 +141,11 @@ public class AstroScopeLogView : MonoBehaviour
 ### 補足
 
 - `Time Zone Id` は Windows と macOS で名称が異なります。Windows: `Tokyo Standard Time` / macOS: `Asia/Tokyo`。他地域でも Windows のタイムゾーン ID 一覧を確認し、例外発生時はログに表示されるフォールバックメッセージを参考に修正してください。
-- エディットモードテストは `Test Runner (Window > General > Test Runner)` の `Edit Mode` タブから `AstroScope/Tests/EditMode` 配下を実行できます。
+- エディットモードテストは `Test Runner (Window > General > Test Runner)` の `Edit Mode` タブから `AstroScope/Tests/Editor` 配下を実行できます。
 
 ## テスト(Mac 環境)
 
-Unity Test Runner の Edit Mode で `AstroScope/Tests/EditMode/AstroScopeCalculatorTests` を実行してください。コマンドライン実行例 (Unity エディターインストール済みの場合):
+Unity Test Runner の Edit Mode で `AstroScope/Tests/Editor/AstroScopeCalculatorTests` を実行してください。コマンドライン実行例 (Unity エディターインストール済みの場合):
 
 ```bash
 /Applications/Unity/Hub/Editor/6000.0.0f1/Unity.app/Contents/MacOS/Unity \

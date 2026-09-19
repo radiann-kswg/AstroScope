@@ -200,7 +200,16 @@ namespace AstroScope
 			double yh = r * (sinOmega * cosWv + cosOmega * sinWv * cosI);
 			double zh = r * (sinWv * sinI);
 
-			return (new Vector3((float)xh, (float)yh, (float)zh), r);
+			// The elements are referred to the J2000.0 mean equinox; rotate into the mean equinox of date with the general
+			// precession in longitude (Meeus ch. 21), otherwise solar terms drift late by ~1.4° per century (~9 h in 2026, ~11.5 h in 2033).
+			// ponytail: nutation and aberration (~0.01° combined, ≈15 min of solar-term time) are still ignored; add them if minute-level accuracy matters.
+			double precession = Angle.ToRadians((5029.0966 * t + 1.11113 * t * t) / 3600.0);
+			double cosP = Math.Cos(precession);
+			double sinP = Math.Sin(precession);
+			double xd = xh * cosP - yh * sinP;
+			double yd = xh * sinP + yh * cosP;
+
+			return (new Vector3((float)xd, (float)yd, (float)zh), r);
 		}
 
 		private static double SolveKepler(double eccentricity, double meanAnomaly)
